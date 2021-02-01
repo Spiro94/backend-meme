@@ -17,10 +17,20 @@ const dynamodb = IS_OFFLINE ? new AWS.DynamoDB.DocumentClient({
     endpoint: 'http://localhost:8000'
 }) : new AWS.DynamoDB.DocumentClient();
 
-//GET GetMemes
-app.get('/memes', (req, res) => {
+//POST GetMemes
+app.post('/getMemes', (req, res) => {
+
+    const { pageSize, id } = req.body;
+
     const params = {
-        TableName: MEMES
+        TableName: MEMES,
+        Limit: pageSize,
+    }
+
+    if (id) {
+        params.ExclusiveStartKey = {
+            id,
+        };
     }
 
     dynamodb.scan(params, (error, result) => {
@@ -31,12 +41,13 @@ app.get('/memes', (req, res) => {
                 message: error
             });
         } else {
-            const { Items } = result;
+            const { Items, LastEvaluatedKey } = result;
 
             res.json({
                 success: true,
                 message: 'ok',
-                Items
+                Items,
+                LastEvaluatedKey: LastEvaluatedKey.id
             });
         }
 
@@ -51,21 +62,17 @@ app.post('/memes', (req, res) => {
     let secondsSinceEpoch = Math.round(Date.now() / 1000)
     let idVar = 'M' + secondsSinceEpoch;
 
-    console.log(idVar);
-    console.log(title);
-    console.log(imageUrl);
-    console.log(category);
-
     const params = {
         TableName: MEMES,
         Item: {
             id: idVar,
             title,
             imageUrl,
+            createdAt: secondsSinceEpoch,
             category,
             upVote: 0,
             downVote: 0,
-        }
+        },
     }
 
     dynamodb.put(params, (error, result) => {
@@ -76,12 +83,11 @@ app.post('/memes', (req, res) => {
                 message: error
             });
         } else {
-            const { Items } = result;
 
             res.json({
                 success: true,
                 message: 'ok',
-                Items
+                item: params.Item
             });
         }
 
